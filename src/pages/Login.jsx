@@ -15,25 +15,33 @@ export default function Login() {
     setError('')
     setIsLoading(true)
     try {
-      // Perform the real Firebase popup sign in flow with Google
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
       
-      // Save basic details in profile if not exists
-      const docRef = doc(db, 'users', user.uid);
-      const docSnap = await getDoc(docRef);
-      if (!docSnap.exists()) {
-         const nameParts = user.displayName ? user.displayName.split(' ') : [];
-         await setDoc(docRef, {
-            firstName: nameParts[0] || '',
-            lastName: nameParts.length > 1 ? nameParts.slice(1).join(' ') : '',
-            studentEmail: user.email || '',
-            photoBase64: user.photoURL || '', 
-            createdAt: new Date().toISOString()
-         }, { merge: true });
-      }
+      // Save basic details in profile asynchronously (Fire and forget)
+      // This allows the user to immediately enter the app without waiting for Firestore
+      const syncProfile = async () => {
+        try {
+          const docRef = doc(db, 'users', user.uid);
+          const docSnap = await getDoc(docRef);
+          if (!docSnap.exists()) {
+             const nameParts = user.displayName ? user.displayName.split(' ') : [];
+             await setDoc(docRef, {
+                firstName: nameParts[0] || '',
+                lastName: nameParts.length > 1 ? nameParts.slice(1).join(' ') : '',
+                studentEmail: user.email || '',
+                photoBase64: user.photoURL || '', 
+                createdAt: new Date().toISOString()
+             }, { merge: true });
+          }
+        } catch (dbError) {
+          console.warn('Firestore profile sync failed:', dbError);
+        }
+      };
+      
+      syncProfile();
 
-      // Navigate to the home page on success
+      // Navigate to the home page immediately after auth succeeds
       navigate('/');
     } catch (err) {
       console.error(err);
